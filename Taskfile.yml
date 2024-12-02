@@ -1,0 +1,43 @@
+version: '3'
+
+tasks:
+  shell:
+    cmds:
+      - poetry shell
+  install:
+    cmds:
+      - poetry install
+      - task: shell
+      - poetry run cli rpc connected # check for setup working
+
+  create-account:
+    cmds:
+      - poetry run cli account new
+  
+  # to ensure bulky run of command
+  # task bulk-sol-balance -- a 1 2 b 3 4
+  bulk-*:
+    vars:
+      OPTS: '{{.CLI_ARGS}}'
+    cmds:
+      - for:
+          var: OPTS
+        task: '{{index .MATCH 0}}'
+        vars:
+          CLI_ARGS: '{{.ITEM}}'
+
+  collect-airdrop:
+    cmds:
+      - echo poetry run cli airdrop {{.CLI_ARGS}} 5 --sol
+  
+  sol-balance:
+    cmds:
+      - echo poetry run cli balance {{.CLI_ARGS}} --sol-
+  
+  start-bot:
+    cmds:
+      - poetry run start-bot
+  
+  fake-target:
+    cmds:
+      - poetry run fake-target

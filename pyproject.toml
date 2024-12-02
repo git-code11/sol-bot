@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "meme-bot"
+version = "0.1.0"
+description = "Meme Coin Bot for Solana chain"
+authors = ["Victor <vector.code11@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+solana = "^0.35.1"
+solders = "0.21.0"
+redis = "^5.2.0"
+pyyaml = "^6.0.2"
+jupiter-python-sdk = "^0.0.2.0"
+aiohttp = {extras = ["speedups"], version = "^3.11.7"}
+python-dotenv = "^1.0.1"
+asyncstdlib = "^3.13.0"
+pyfiglet = "^1.0.2"
+colorama = "^0.4.6"
+termcolor = "^2.5.0"
+httpx = "^0.28.0"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.13.0"
+
+[tool.poetry.scripts]
+cli = "meme_bot.cli:execute"
+connected = "meme_bot.cli:connected"
+start-bot = "meme_bot.bot:start"
+bot-balance = "meme_bot.main:balance"
+fake-target = "meme_bot.test:start"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
