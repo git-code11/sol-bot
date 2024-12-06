@@ -65,7 +65,14 @@ async def run():
         payer_sk = Keypair()
         payMint = "So11111111111111111111111111111111111111112"
         memeMint = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
+        usdcMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
         
+        resp = await JupiterApi.get_token_price(
+            memeMint,
+            #vsToken=usdcMint
+        )
+        print("PRICE =>", resp["data"][memeMint])
+        return
         resp = await JupiterApi.swap_tx(
             inputMint=payMint,
             outputMint=memeMint,

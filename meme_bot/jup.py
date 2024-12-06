@@ -52,8 +52,7 @@ class JupiterApi:
 
     @staticmethod
     async def get_token_price(
-        ids:List[str],
-        *,
+        *ids:str,
         vsToken:Optional[str]=None,
         showExtraInfo:Optional[bool]=None
     ) -> dict:
