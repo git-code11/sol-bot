@@ -132,16 +132,16 @@ class MemeBot:
 
     async def _sell_handler(self, client: AsyncClient, websocket: SolanaWsClientProtocol):
         try:
-            async with asyncio.timeout(self._timeout):
+            async with asyncio.timeout(self._timeout) as _timeout:
                 async for idx, [msg] in enumerate(websocket):
                     msg_ = cast(LogsNotification, msg)
                     print(f"[BOT-LOG]: {msg_.result.value.signature} mentions Target {self._target_ata_pk}")
                     balance_change = await self._target_balance_difference(client)
                     if balance_change < 0:
+                        _timeout.reschedule(None)
                         print("Target balance has decreased")
                         print("Sell now")
                         await self._sell(client)
-                        break
         except asyncio.TimeoutError:
             print("Making sales immediately now")
             print("Sell now")
