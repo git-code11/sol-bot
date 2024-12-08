@@ -25,17 +25,14 @@ from solana.rpc.types import DataSliceOpts
 from solana.rpc.websocket_api import connect, SolanaWsClientProtocol
 from solana.rpc.core import RPCException
 
-from solana.rpc.types import TxOpts
 from solana.rpc.async_api import AsyncClient
-from solana.rpc.commitment import Processed
 import websockets.exceptions
-import websockets
 
 
 from . import JupiterApi
 from . import utils
 
-import json
+import inquirer
 
 # use Colorama to make Termcolor work on Windows too
 just_fix_windows_console()
@@ -46,7 +43,7 @@ just_fix_windows_console()
 class SaleType(enum.Enum):
     CAPPED="CAPPED"
     TIMER="TIMER"
-    BOTH=""
+    BOTH="BOTH"
 
 WRAPPED_SOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
@@ -344,7 +341,7 @@ class MemeBot:
             self._mint_price = float(resp['data'][meme_addr]['price'])
         return self._mint_price
     
-    async def _tell_price(self):
+    """ async def _tell_price(self):
         USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
         SOL = "So11111111111111111111111111111111111111112"
         jupiter = JupiterApi()
@@ -352,7 +349,7 @@ class MemeBot:
             SOL, USDC,
             vsToken=USDC
         )
-        print(res)
+        print(res) """
 
     async def __call__(self,  *args, **kwargs):
         async with AsyncClient(ENDPOINT_API) as client:
@@ -373,19 +370,20 @@ def print_screen():
     cprint(pyfiglet.figlet_format("MEMEBOT", font="larry3d"), "blue", attrs=["bold"], end="")
     cprint(pyfiglet.figlet_format("-- Meme Bot Started --", font="term"), "blue", attrs=["bold", "underline"])
 
-#account
-TARGET_ADDR = "87esLg2WdmndkRjYrxNene4cXrGsSAeVyQxAG9tcRh1m"
-BOT_KEY = "6878f7061c40114ce10b7af8fb4469d98a9bb7957a56fd8c43203ad545199014"
-#token
-
-MEME_ADDR = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
-#settings
-SALE_TIMEOUT = 2 * 60 # 3 minutes
-MIN_PROFIT_AMOUNT = 200 # in USD
 
 
-async def main():
-    
+
+""" async def main():
+    #account
+    TARGET_ADDR = "87esLg2WdmndkRjYrxNene4cXrGsSAeVyQxAG9tcRh1m"
+    BOT_KEY = "6878f7061c40114ce10b7af8fb4469d98a9bb7957a56fd8c43203ad545199014"
+    #token
+
+    MEME_ADDR = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
+    #settings
+    SALE_TIMEOUT = 2 * 60 # 3 minutes
+    MIN_PROFIT_AMOUNT = 200 # in USD
+
     bot = MemeBot(
         bot_secret=BOT_KEY,
         target_addr=TARGET_ADDR,
@@ -396,33 +394,41 @@ async def main():
     bot_task = asyncio.create_task(bot())
     await bot_task
     print("Done")
+ """
 
 
 def start():
-    meme_addr=input(colored("Enter meme coin address =>", "magenta"))
-    target_addr = input(colored("Enter target address =>", "blue"))
-    amount=input(colored("Enter amount in sol to purchase=>", "yellow"))
-    amount = utils.sol_to_lamport(float(amount))
-    timeout=input(colored("Enter the sale time interval from sales in seconds=>"))
-    timeout = int(timeout)
-    capped_amount = input(colored("Enter the sale capped amount from sales in dollars=>", "yellow"))
-    capped_amount = float(capped_amount)
-    bot_secret= input(colored("Enter Bot SecretKey=>", "red"))
-    sale_type = input(colored("Enter T for timed interval or C for capped amount profit strategy on meme coin sales=>", "yellow"))
-    sale_type = sale_type.lower()
-    data = dict(
-        target_addr=target_addr,
-        meme_addr=meme_addr,
-        amount=amount,
-        timeout=timeout,
-        min_profit=capped_amount,
-        bot_secret=bot_secret,
-        sale_type= SaleType.TIMER if sale_type=='T' else SaleType.CAPPED
-    )
-    
+    non_empty_validator = lambda _, x: len(x)>0
+    questions = [
+        inquirer.Text("meme_addr", message="Enter meme coin address", validate=non_empty_validator),
+        inquirer.Text("target_addr", message="Enter target address", validate=non_empty_validator),
+        inquirer.Text("amount", message="Enter amount in sol to purchase", validate=non_empty_validator, default=0.001),
+        inquirer.Text("timeout", message="Enter the sale time interval from sales in seconds", validate=non_empty_validator, default=120),
+        inquirer.Text("min_profit", message="Enter the profit amount for sales in dollars", validate=non_empty_validator, default=2.75),
+        inquirer.Text("poll_interval", message="Enter Polling Interval in minute", validate=non_empty_validator, default=1),
+        inquirer.Text("bot_secret", message="Enter Bot SecretKey", validate=non_empty_validator),
+        inquirer.Checkbox(
+            "sale_type",
+            message="Select the meme coin sales strategy?",
+            choices=[
+                ("Timed Interval", SaleType.TIMER),
+                ("Capped Amount", SaleType.CAPPED),
+                ("Combined Strategy", SaleType.BOTH),
+            ],
+            default=[SaleType.TIMER]
+        ),
+    ]
+        
+    data = inquirer.prompt(questions)
+    # preprocess
+    data['amount'] = float(data['amount'])
+    data['timeout'] = int(data['timeout'])
+    data['min_profit'] = float(data['min_profit'])
+    data['sale_type'] = data['sale_type'][0]
+    data['poll_interval'] = float(data['poll_interval'])*60
+
     bot = MemeBot(
-        **data,
-        poll_interval=1*60 # 1 mins
+        **data
     )
 
     print_screen()
