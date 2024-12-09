@@ -29,8 +29,9 @@ from solana.rpc.async_api import AsyncClient
 import websockets.exceptions
 
 
-from . import JupiterApi
-from . import utils
+from jup import JupiterApi
+import utils
+
 
 import inquirer
 
