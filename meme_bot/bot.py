@@ -199,7 +199,7 @@ class MemeBot:
                 # subscribe to log for target token account
                 
                 await self._subscribe_to_log(websocket)
-                print("HERE")
+                
                 print(f"[BOT]: Log Subscribe to {self._target_ata_pk}")
                 resp = await websocket.recv()
                 self._subscription_id = cast(SubscriptionResult, resp[0]).result
