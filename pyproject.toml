@@ -30,9 +30,7 @@ mypy = "^1.13.0"
 [tool.poetry.scripts]
 cli = "meme_bot.cli:execute"
 connected = "meme_bot.cli:connected"
-start-bot = "meme_bot.bot:start"
-bot-balance = "meme_bot.main:balance"
-fake-target = "meme_bot.test:start"
+start-bot = "meme_bot.main:start"
 
 [build-system]
 requires = ["poetry-core"]
