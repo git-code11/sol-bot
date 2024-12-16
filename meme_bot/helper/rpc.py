@@ -8,7 +8,7 @@ from solders.keypair import Keypair # type: ignore
 
 from .. import utils
 
-ENDPOINT = utils.get_env_rpc_url()
+(ENDPOINT, _) = utils.get_env_rpc_url()
 
 async def connected():
     async with AsyncClient(ENDPOINT) as client:

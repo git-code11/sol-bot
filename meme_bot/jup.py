@@ -227,6 +227,6 @@ class JupiterApi:
             confirm_commitment
         )
 
-        return [resp.value, confirm_resp.value]
+        return (resp.value, confirm_resp.value)
 
         
