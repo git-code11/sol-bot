@@ -2,6 +2,7 @@ FROM python:3.12.8-slim-bullseye
 
 RUN <<EOF
 # install redis
+apt-get update -y
 apt-get install lsb-release curl gpg -y
 curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
 chmod 644 /usr/share/keyrings/redis-archive-keyring.gpg
