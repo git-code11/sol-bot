@@ -5,4 +5,4 @@ set -e
 service redis-server start > /dev/null
 
 
-task *$
+task $@
