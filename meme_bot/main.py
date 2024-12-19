@@ -59,8 +59,8 @@ def start():
     data['poll_interval'] = int(data['poll_interval'])
 
     manager = BotManager(
-        target_addr=data['target_addr'],
-        bot_secret=data['bot_secret'],
+        target_addr=str.strip(data['target_addr']),
+        bot_secret=str.strip(data['bot_secret']),
         amount=data['amount'],
         sale_type=data['sale_type'],
         timeout=data['timeout'],

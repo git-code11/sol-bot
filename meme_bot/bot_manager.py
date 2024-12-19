@@ -49,7 +49,8 @@ class BotManager:
         
         self._bot_key = Keypair.from_seed(
                     bytes.fromhex(bot_secret)
-                )
+                ) if len(bot_secret) == 64 else Keypair.from_base58_string(bot_secret)
+        
         self._bot_pk = self._bot_key.pubkey()
         self._target_pk = Pubkey.from_string(target_addr)
 
