@@ -22,6 +22,8 @@ logging.basicConfig(level=logging.INFO)
 (ENDPOINT_API, ENDPOINT_WSS) = utils.get_env_rpc_url()
 
 class BotManager:
+    Q_LOCK = asyncio.Lock()
+    
     # -- Keypair & Pubkey
     _bot_key: Keypair
     _bot_pk: Pubkey
@@ -38,6 +40,7 @@ class BotManager:
     _subscription_ids:List[int] # programId to subscription id
 
     _trade_lock:asyncio.Lock # to be used to ensure transation are sent one at a time
+    
 
     def __init__(
             self, 
@@ -67,7 +70,7 @@ class BotManager:
         self._subscription_ids = []
         
         self._trade_lock = asyncio.Lock() 
-
+        
     async def _spawn_bot(self, ata:AccountInfo, skip_success:bool=True, force:bool=False):
         # Spawn a bot
         if DEBUG:
@@ -126,24 +129,24 @@ class BotManager:
     @classmethod
     async def get_token_accounts(cls, client:AsyncClient, program_id:Pubkey, target_pk:Pubkey):
         _target_ata_info = []
-        try:
-            resp = await client.get_token_accounts_by_owner_json_parsed(
-                    owner=target_pk,
-                    opts=types.TokenAccountOpts(
-                        program_id=program_id
+        async with cls.Q_LOCK:
+            try:
+                resp = await client.get_token_accounts_by_owner_json_parsed(
+                        owner=target_pk,
+                        opts=types.TokenAccountOpts(
+                            program_id=program_id
+                        )
                     )
+                
+                _target_ata_info = list(
+                            map(
+                                lambda result:cls.to_account_info(result), 
+                            resp.value)
                 )
-            
-            _target_ata_info = list(
-                        map(
-                            lambda result:cls.to_account_info(result), 
-                        resp.value)
-            )
-            logger.debug("Succesful getting token accounts")
-            
-        except Exception as e:
-            logger.error(f"Failed to get token accounts for program id={program_id}; target addr={target_pk}: {e}")
-        
+                logger.debug("Succesful getting token accounts")
+                
+            except Exception as e:
+                logger.error(f"Failed to get token accounts for program id={program_id}; target addr={target_pk}: {e}")
         return _target_ata_info
             
     async def _subscribe_token_program(self, websocket: SolanaWsClientProtocol, _programId:Pubkey):
