@@ -161,7 +161,7 @@ async def transfer_token(src_sk:str, dest_pk:str, mint_pk:str, amount: int, form
 async def mint_drop(src_sk:str,  mint_pk:str, amount: int, format:bool):
     async with AsyncClient(ENDPOINT) as client:
         
-        _mint_pk = Pubkey.from_stri/ng(mint_pk)
+        _mint_pk = Pubkey.from_string(mint_pk)
         tk_acct_info = await client.get_account_info(Pubkey.from_string(mint_pk))
         tk_info = Mint.from_bytes(tk_acct_info.value.data)
 
