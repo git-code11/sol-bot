@@ -261,8 +261,7 @@ class BotManager:
                                         if ata.amount > 0: # check if amount is increased
                                             # spawn bot
                                             tg.create_task(
-                                                self._spawn_bot(ata),
-                                                force=True
+                                                self._spawn_bot(ata, force=True),
                                             )
                                     
                                     _target_ata_map[mint_pk] = ata # update local map with new account info
