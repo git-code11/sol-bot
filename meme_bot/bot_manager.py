@@ -1,3 +1,4 @@
+import logging
 import functools
 import itertools
 import asyncstdlib
@@ -14,6 +15,9 @@ from solana.rpc.async_api import AsyncClient
 from spl.token.constants import TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID
 from .bot import MemeBot, SaleType # type: ignore
 from . import USDC, DEBUG, BotStatus, AccountInfo, utils, get_redis_client, REDIS_MINTS_KEY
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 (ENDPOINT_API, ENDPOINT_WSS) = utils.get_env_rpc_url()
 
@@ -78,14 +82,14 @@ class BotManager:
             if bot_status == BotStatus.SUCCESS:
                 force = (not skip_success) and force
                 # skip bot creation already sold here
-                print(f"{ata.mint} skip bot creation already sold here")
+                logger.info(f"[{ata.mint}]: Bot skipped this token because it has already been traded")
             
             elif bot_status == BotStatus.STARTED or force:
                 # spawn bot with skip purchase and continue to sale
                 if bot_status == BotStatus.STARTED:
-                    print(f"{ata.mint} spawn bot with skip purchase and continue to sale")
+                    logger.info(f"[{ata.mint}]: Bot is spawned for token to skip purchase and continue to sale")
                 else:
-                    print(f"{ata.mint} Spawning new bot for a new task")
+                    logger.info(f"[{ata.mint}]: Bot is spawned to execute new trade")
                 #spawn bot
                 bot = MemeBot(
                         lock=self._trade_lock,
@@ -101,11 +105,11 @@ class BotManager:
                 try:
                     await bot()
                 except Exception as e:
-                    print("Error in bot: ", e)
+                    logger.error(f"Error occured when bot was exceuting trade: {e}")
             
             else:
                 # spawn bot with idle start but could not make purchase
-                print(f"{ata.mint} spawn bot is idle and not active") # would decide later whether to spawn a bot on this or not
+                logger.debug(f"[{ata.mint}]: No condition meant to spawn bot for trade execution") # would decide later whether to spawn a bot on this or not
         
     
     @staticmethod
@@ -121,19 +125,25 @@ class BotManager:
 
     @classmethod
     async def get_token_accounts(cls, client:AsyncClient, program_id:Pubkey, target_pk:Pubkey):
-        resp = await client.get_token_accounts_by_owner_json_parsed(
-                owner=target_pk,
-                opts=types.TokenAccountOpts(
-                    program_id=program_id
+        _target_ata_info = []
+        try:
+            resp = await client.get_token_accounts_by_owner_json_parsed(
+                    owner=target_pk,
+                    opts=types.TokenAccountOpts(
+                        program_id=program_id
+                    )
                 )
+            
+            _target_ata_info = list(
+                        map(
+                            lambda result:cls.to_account_info(result), 
+                        resp.value)
             )
-
-        _target_ata_info = list(
-                    map(
-                        lambda result:cls.to_account_info(result), 
-                    resp.value)
-        )
-
+            logger.debug("Succesful getting token accounts")
+            
+        except Exception as e:
+            logger.error(f"Failed to get token accounts for program id={program_id}; target addr={target_pk}: {e}")
+        
         return _target_ata_info
             
     async def _subscribe_token_program(self, websocket: SolanaWsClientProtocol, _programId:Pubkey):
@@ -148,7 +158,7 @@ class BotManager:
                 ) # Owner field in SPL token account
             ]
         )
-        print(f"[BOT]:[{_programId}]:Program Subscribed")
+        logger.info(f"[{_programId}]:Program Subscribed")
  
     async def _unsubscribe_token_program(self, websocket: SolanaWsClientProtocol):
         for sub_id in self._subscription_ids:
@@ -157,12 +167,13 @@ class BotManager:
 
     async def _resume_task(self, program_id:Pubkey):
         # to be populated on init
-        print("Trying to resume task for program ", program_id)
+        logger.info(f"[{program_id}]:checking to see if any task need resumption")
         async with get_redis_client() as redis_client:
             async with asyncio.TaskGroup() as tg:
                 async with AsyncClient(ENDPOINT_API) as client:
                     # 1. Get the token accounts for the target wallet
-                    try:    
+                    try:
+                        logger.info(f"[{program_id}]:[{self._target_pk}]:Checking to resume uncompleted task")
                         _target_ata_info = await self.get_token_accounts(
                             client,
                             program_id,
@@ -175,46 +186,49 @@ class BotManager:
                         
                         for i, is_member in enumerate(is_members):
                             if is_member:
-                                print(f"Target mint {target_mints[i]} already in bot skipped or resume")
+                                logger.debug(f"[{target_mints[i]}]: Mint already discovered recognized by bot (for skip or resume)")
                             else:
-                                print(f"Target mint {target_mints[i]} scheduled to run newly")
-                                    
+                                logger.debug(f"[{target_mints[i]}]: Mint discovered to be scheduled to run newly")
+                        
                         for account in _target_ata_info:
                             # check for existing bot status running for the current account
                              tg.create_task(
                                     self._spawn_bot(account)
                                 )
                     except Exception as e:
-                        print("Failed to Resume Task with error: ", e)
-        print("RESUME TASK END for program ", program_id)
+                        logger.error(f"[{program_id}]: Error occured while resuming task: {e}")
+                        
+        logger.debug(f"[{program_id}]:RESUME TASK COMPLETED")
 
     async def _watch_task(self, program_ids:List[Pubkey]):
-        print("Watching for token balance update")
+        logger.info("Watcher setup for token account balance update")
         _target_ata_map = dict()
         
         async with AsyncClient(ENDPOINT_API) as client:
-            # 1. Get the token accounts for the target wallet
-            # print("Getting target token account")
-            _target_atas = itertools.chain.from_iterable(
-                await asyncio.gather(
-                    *map(
-                        lambda program_id:
-                            self.get_token_accounts(
-                            client,
-                            program_id,
-                            self._target_pk
-                        ),
-                        program_ids
+            try:
+                # 1. Get the token accounts for the target wallet
+                _target_atas = itertools.chain.from_iterable(
+                    await asyncio.gather(
+                        *map(
+                            lambda program_id:
+                                self.get_token_accounts(
+                                client,
+                                program_id,
+                                self._target_pk
+                            ),
+                            program_ids
+                        )
                     )
                 )
-            )
-            
-            
-            _target_ata_map: Dict[str, AccountInfo] = functools.reduce(
-                lambda atas_map, ata: {**atas_map, (str(ata.mint)):ata},
-                _target_atas,
-                _target_ata_map
-            )
+                
+                _target_ata_map: Dict[str, AccountInfo] = functools.reduce(
+                    lambda atas_map, ata: {**atas_map, (str(ata.mint)):ata},
+                    _target_atas,
+                    _target_ata_map
+                )
+            except Exception as e:
+                # when the error is different
+                logger.error("[WATCHER-PRE]: Error occured: ", e)
         
         async with get_redis_client() as redis_client:  
             async with asyncio.TaskGroup() as tg:
@@ -224,20 +238,20 @@ class BotManager:
                             await asyncio.gather(*[
                                 self._subscribe_token_program(websocket, program_id) for program_id in program_ids
                             ])
-                            print("Subscribed to Token Program")
+                            logger.debug("Subscribed to Token Program")
                             async for idx, [msg_] in asyncstdlib.enumerate(websocket):
-                                print(f"Got Event {idx}")
+                                logger.info(f"[EVENT-{idx}]: Got new event")
                                 if isinstance(msg_, SubscriptionResult):
                                     msg = cast(SubscriptionResult, msg_)
                                     self._subscription_ids.append(msg.result)
-                                    print("Subscription Event:", msg.result)
+                                    logger.info(f"[EVENT-{idx}]: Subscription Event: {msg.result}")
                                 elif isinstance(msg_, ProgramNotificationJsonParsed):
                                     msg = cast(ProgramNotificationJsonParsed, msg_)
                                     if not msg.subscription in self._subscription_ids:
-                                        print("Adding subscription ID into box ", msg.subscription)
+                                        logger.debug(f"[EVENT-{idx}]: Adding subscription ID into box {msg.subscription}")
                                         self._subscription_ids.append(msg.subscription)
                                     ata = self.to_account_info(msg.result.value)
-                                    print("Program Event:", ata)
+                                    logger.info(f"[EVENT-{idx}]: Program Event: {ata}")
                                     mint_pk = str(ata.mint)
                                     if mint_pk in _target_ata_map:
                                         if ata.amount > _target_ata_map[mint_pk].amount:
@@ -266,7 +280,7 @@ class BotManager:
                                     
                                     _target_ata_map[mint_pk] = ata # update local map with new account info
                                 else:
-                                    print("Unknown Event:", msg_)                   
+                                    logger.info("[EVENT-{idx}]: Unknown Event: {msg_}")                   
                         self._subscription_ids.clear() # Clear subscription IDS HERE
                 
                 except asyncio.CancelledError:
@@ -275,9 +289,9 @@ class BotManager:
                     
                 except Exception as e:
                     # when the error is different
-                    print("[ERROR-OCCURED]:", e)
+                    logger.error("[WATCHER_POST]: Error occured: {e}")
                 finally:
-                    print("Watcher Ended")
+                    logger.debug(f"WATCHER TASK COMPLETED")
                     
     async def run(self):
         try:
@@ -287,9 +301,9 @@ class BotManager:
                 tg.create_task(self._watch_task([TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID]))
             
         except Exception as e:
-            print("Exception in main", e)
+            logger.error(f"Exception in run {e}")
         finally:
-            print("RUN END")
+            logger.debug("MANAGER ENDED")
 
 # 1. Get the token accounts for the target wallet
     # save mint 

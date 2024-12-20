@@ -1,3 +1,4 @@
+import logging
 import contextlib
 import datetime
 from typing import Optional, cast
@@ -14,6 +15,8 @@ from solana.rpc.core import RPCException
 from solana.rpc.async_api import AsyncClient
 from . import TX_RETRIES, USDC, WRAPPED_SOL, AccountInfo, BotStatus, JupiterApi, SaleType, get_redis_client, print_screen
 from . import utils, DEBUG
+
+logger = logging.getLogger(__name__)
 
 
 #(ENDPOINT_API, ENDPOINT_WSS) = utils.get_env_rpc_url("prod")
@@ -78,7 +81,7 @@ class MemeBot:
     async def _init(self, client:AsyncClient):
         meme_acct_info = (await client.get_account_info(self._target_ata_info.mint)).value
         if not meme_acct_info:
-            print("Meme coin does not exist")
+            logging.critical("Meme coin does not exist")
             raise asyncio.CancelledError("Meme coin Invalid")
         
         # get token info
@@ -99,6 +102,7 @@ class MemeBot:
         if resp and resp['data'][meme_addr]:
             self._mint_price = float(resp['data'][meme_addr]['price'])
         else:
+            logging.critical("No price for token please kindly check jupiter in token exists there and contact the programmer")
             raise asyncio.CancelledError("No price for token")
         return self._mint_price
     
@@ -107,16 +111,16 @@ class MemeBot:
         if old_mint_price != None:
             mint_price = await self._refresh_mint_price()
             meme_addr = str(self._target_ata_info.mint)
-            print(f"{meme_addr} Mint price is currently %f" % mint_price)
+            logging.info(f"[{meme_addr}]:Mint price is currently {mint_price}")
             return mint_price - old_mint_price
         return 0
       
     async def _buy_task(self, client:AsyncClient):
-        print("Making purchase here")
         meme_addr = str(self._target_ata_info.mint)
+        logging.info(f"[{meme_addr}]:Making purchase here, Amount: [{self._amount}]")
         retries = TX_RETRIES
         raw_tx = None
-        print("Amount ", self._amount)
+        #print("Amount ", self._amount)
         while retries > 0:
             try:
                 with contextlib.suppress(RPCException, redis.exceptions.ConnectionError):
@@ -133,11 +137,12 @@ class MemeBot:
                         if DEBUG:
                             async with self._lock:
                                 result = await client.simulate_transaction(txn=raw_tx)
-                            print("Errors => ", result.value.err)
-                            print("Unit Consumd => ", result.value.units_consumed)
+                            logging.info(f"[{meme_addr}]: Transaction error: {result.value.err}")
+                            logging.info(f"[{meme_addr}]: Unit Consumd: {result.value.units_consumed}")
+                            #print("Unit Consumd => ", result.value.units_consumed)
                             if result.value.err:
                                 # error occured retry
-                                print("Error occured in simulated BUY TX ")
+                                logger.error(f"[{meme_addr}]: Error occured in simulated BUY TX ")
                             else:
                                 self._purchased = True
                         else:
@@ -149,10 +154,12 @@ class MemeBot:
                                     verbose=True
                                 )
                             tx_status = cast(TransactionStatus, result[1])
-                            print("Tx Status: ", tx_status.confirmation_status)
-                            print("Errors=> ", tx_status.err)
+                            logging.info(f"[{meme_addr}]: Transaction error: {tx_status.err}")
+                            logging.info(f"[{meme_addr}]: Transaction status: {tx_status.err}")
+                            # print("Tx Status: ", tx_status.confirmation_status)
+                            # print("Errors=> ", tx_status.err)
                             if tx_status.err:
-                                print('An error occured in Buy Tx')
+                                logger.error('An error occured in Buy Tx')
                             else:
                                 self._purchased = True
                         
@@ -171,9 +178,10 @@ class MemeBot:
                             break
 
             except Exception as e:
-                print("Error Occured during buy", e)
+                logger.error("Error Occured during buy {e}")
                 continue
             finally:
+                logger.info(f"[{meme_addr}]: Retrying RETRY LEFT = {retries}")
                 retries -= 1
 
     async def _sell_task(self, client: AsyncClient):
@@ -186,7 +194,7 @@ class MemeBot:
             while True:
                 mint_price_diff = await self._mint_price_difference()
                 if mint_price_diff >= self._min_profit:
-                    print(f"Profit reached {mint_price_diff}")
+                    logger.info(f"Profit reached {mint_price_diff}")
                     await self._sell(client)
                     break
                 await asyncio.sleep(self.poll_interval)
@@ -199,16 +207,16 @@ class MemeBot:
                     while True:
                         mint_price_diff = await self._mint_price_difference()
                         if mint_price_diff >= self._min_profit:
-                            print(f"Profit reached {mint_price_diff}")
+                            logger.info(f"Profit reached {mint_price_diff}")
                             break
                         await asyncio.sleep(self.poll_interval)
-            print("Sell now")
+            logger.debug("Selling now")
             await self._sell(client)
             
     async def _sell(self, client:AsyncClient):
-        print("Making sales here")
+        logger.info("Making sales here")
         meme_addr = str(self._target_ata_info.mint)
-        retries = TX_RETRIES
+        retries = int(TX_RETRIES * 1.5) # retries for sale 
         _bot_ata_pk = utils.get_ata_pub_key(
             self._bot_pk,
             self._target_ata_info.mint,
@@ -216,7 +224,7 @@ class MemeBot:
         )
         token_balance = await client.get_token_account_balance(_bot_ata_pk)
         token_balance = int(token_balance.value.amount)//(1000 if DEBUG else 1)
-        print("token_balance", token_balance)
+        logger.info("Token Amount in sale {token_balance}")
         _is_sold = False
         raw_tx = None
         while retries > 0:
@@ -234,11 +242,11 @@ class MemeBot:
                         if DEBUG:
                             async with self._lock:
                                 result = await client.simulate_transaction(txn=raw_tx)
-                            print("Errors => ", result.value.err)
-                            print("Unit Consumd => ", result.value.units_consumed)
+                            logger.info("Errors => ", result.value.err)
+                            logger.info("Unit Consumd => ", result.value.units_consumed)
                             if result.value.err:
                                 # error occured retry
-                                print("Error occured in simulated SELL TX")
+                                logger.error("Error occured in simulated SELL TX")
                             else:
                                 _is_sold = True
                         else:
@@ -250,10 +258,10 @@ class MemeBot:
                                     verbose=True
                                 )                    
                             tx_status = cast(TransactionStatus, result[1])
-                            print("Tx Status: ", tx_status.confirmation_status)
-                            print("Errors=> ", tx_status.err)
+                            logger.info("Tx Status: ", tx_status.confirmation_status)
+                            logger.info("Errors=> ", tx_status.err)
                             if tx_status.err:
-                                print('An error occured in Sell Tx')
+                                logger.error('An error occured in Sell Tx')
                             else:
                                 _is_sold = True
                         
@@ -271,13 +279,14 @@ class MemeBot:
                             break
 
             except Exception as e:
-                print("Error Occured during sell", e)
+                logger.error("Error Occured during sell {e}")
                 continue
             finally:
+                logger.info(f"Retrying Sales RETRY LEFT = {retries}")
                 retries -= 1
             
     async def _run(self, client: AsyncClient):
-        print("[BOT STARTED]")
+        logger.info("[BOT STARTED]")
         if not self._purchased:
             await self._buy_task(client)
         
@@ -288,7 +297,7 @@ class MemeBot:
     async def __call__(self, skip_recover=True):
         async with AsyncClient(ENDPOINT_API) as client:
             if await client.is_connected():           
-                print("""BOT WALLET: %s\nMEME COIN: %s"""%(self._bot_pk, self._target_ata_info.mint))
+                logger.info("""BOT WALLET: %s\nMEME COIN: %s"""%(self._bot_pk, self._target_ata_info.mint))
                 
                 execute_bot = True
                 if not skip_recover:
@@ -298,9 +307,9 @@ class MemeBot:
                     await self._init(client)
                     await self._run(client)
                 else:
-                    print("Bot already ran for this meme")
+                    logger.info("Bot already ran for this meme")
             else:
-                print("[BOT]: Failed to connect to rpc")
+                logger.critical("[BOT]: Failed to connect to rpc")
 
 
 def start():
