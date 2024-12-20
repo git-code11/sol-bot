@@ -238,6 +238,9 @@ class BotManager:
             async with asyncio.TaskGroup() as tg:
                 try:
                     async for websocket in connect(ENDPOINT_WSS):
+                        with contextlib.suppress(websockets.exceptions.WebSocketException):
+                            await self._unsubscribe_token_program(websocket) # closing websocket
+                            
                         with contextlib.suppress(websockets.exceptions.ConnectionClosed):
                             await asyncio.gather(*[
                                 self._subscribe_token_program(websocket, program_id) for program_id in program_ids

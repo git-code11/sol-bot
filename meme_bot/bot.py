@@ -93,7 +93,7 @@ class MemeBot:
             # get token price
             await self._refresh_mint_price()
         except Exception as e:
-            logger.critical(f"ERRROR in INIT: {e}", e)
+            logger.critical(f"ERRROR in INIT: {e}")
             raise asyncio.CancelledError(f"[INIT-BOT]: Error occured: {e}")
 
     async def _refresh_mint_price(self):
