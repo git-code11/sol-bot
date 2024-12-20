@@ -17,9 +17,8 @@ from .bot import MemeBot, SaleType # type: ignore
 from . import USDC, DEBUG, BotStatus, AccountInfo, utils, get_redis_client, REDIS_MINTS_KEY
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
-(ENDPOINT_API, ENDPOINT_WSS) = utils.get_env_rpc_url()
+(ENDPOINT_API, ENDPOINT_WSS) = utils.get_env_rpc_url("dev" if DEBUG else None)
 
 class BotManager:
     Q_LOCK = asyncio.Lock()
@@ -118,12 +117,13 @@ class BotManager:
     @staticmethod
     def to_account_info(result: RpcKeyedAccountJsonParsed):
         data =  AccountInfo(
-            result.account.owner,
-            result.account.data.parsed["info"]["owner"],
-            result.pubkey,
-            result.account.data.parsed["info"]["mint"],
+            utils.to_pubkey(result.account.owner),
+            utils.to_pubkey(result.account.data.parsed["info"]["owner"]),
+            utils.to_pubkey(result.pubkey),
+            utils.to_pubkey(result.account.data.parsed["info"]["mint"]),
             int(result.account.data.parsed["info"]["tokenAmount"]["amount"])
         )
+        print(f"ATA INFO {data}")
         return data
 
     @classmethod
@@ -131,6 +131,7 @@ class BotManager:
         _target_ata_info = []
         async with cls.Q_LOCK:
             try:
+                
                 resp = await client.get_token_accounts_by_owner_json_parsed(
                         owner=target_pk,
                         opts=types.TokenAccountOpts(
@@ -292,15 +293,17 @@ class BotManager:
                     
                 except Exception as e:
                     # when the error is different
-                    logger.error("[WATCHER_POST]: Error occured: {e}")
+                    logger.error(f"[WATCHER_POST]: Error occured: {e}")
                 finally:
                     logger.debug(f"WATCHER TASK COMPLETED")
                     
     async def run(self):
         try:
             async with asyncio.TaskGroup() as tg: 
-                tg.create_task(self._resume_task(TOKEN_2022_PROGRAM_ID))
-                tg.create_task(self._resume_task(TOKEN_PROGRAM_ID))
+                # tg.create_task(self._resume_task(TOKEN_2022_PROGRAM_ID))
+                # await asyncio.sleep(30) # wait for 30 seconds due to limit
+                # tg.create_task(self._resume_task(TOKEN_PROGRAM_ID))
+                # await asyncio.sleep(30) # wait for 30 seconds due to limit
                 tg.create_task(self._watch_task([TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID]))
             
         except Exception as e:

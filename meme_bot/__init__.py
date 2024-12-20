@@ -7,9 +7,11 @@ from solders.pubkey import Pubkey # type: ignore
 from dotenv import load_dotenv
 load_dotenv()
 
+
 def get_env_rpc_url(env_var:Optional[str]=None,default:str="prod"):
     #print("ENV ", os.environ.get("MEME_BOT_ENV", default))
     IS_PRODUCTION = env_var or os.environ.get("MEME_BOT_ENV", default)
+    
     if IS_PRODUCTION:
         IS_PRODUCTION = IS_PRODUCTION.lower().startswith("prod")
     else:
@@ -35,6 +37,7 @@ REDIS_MINTS_KEY = "tokens"
 
 DEBUG = False
 TX_RETRIES = 3
+LAG_TIME = 60
 
 
 class SaleType(enum.Enum):

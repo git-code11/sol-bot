@@ -6,9 +6,9 @@ from solders.message import Message # type: ignore
 from solders.transaction import Transaction # type: ignore
 from solders.keypair import Keypair # type: ignore
 
-from .. import utils
+from .. import utils, DEBUG
 
-(ENDPOINT, _) = utils.get_env_rpc_url()
+(ENDPOINT, _) = utils.get_env_rpc_url("dev" if DEBUG else None)
 
 async def connected():
     async with AsyncClient(ENDPOINT) as client:

@@ -11,9 +11,9 @@ from solders.message import MessageV0 # type: ignore
 from solders.transaction import VersionedTransaction # type: ignore
 from solana.rpc.types import DataSliceOpts
 from solders.token.state import Mint # type: ignore
-from .. import utils
+from .. import utils, DEBUG
 
-(ENDPOINT, _ ) = utils.get_env_rpc_url()
+(ENDPOINT, _ ) = utils.get_env_rpc_url("dev" if DEBUG else None)
 
 async def new_mint(payer_sk:str, decimals:int, supply:int=0):
     async with AsyncClient(ENDPOINT) as client:

@@ -22,3 +22,6 @@ def get_ata_pub_key(acct_pub_key:Pubkey, mint_pub_key: Pubkey, token_program: Pu
         mint_pub_key,
         token_program
     )
+
+def to_pubkey(addr:Pubkey|str):
+    return Pubkey.from_string(addr) if type(addr)==str else addr
