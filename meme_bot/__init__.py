@@ -17,7 +17,7 @@ def get_env_rpc_url(env_var:Optional[str]=None,default:str="prod"):
     
     if IS_PRODUCTION:
         return (
-            os.environ.get("RPC_ENDPOINT_URL_ALCHEMY_PROD"), 
+            os.environ.get("RPC_ENDPOINT_URL_PROD"), 
             os.environ.get("RPC_ENDPOINT_WSS_PROD")
         )
     else:
