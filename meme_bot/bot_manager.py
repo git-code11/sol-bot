@@ -123,7 +123,7 @@ class BotManager:
             utils.to_pubkey(result.account.data.parsed["info"]["mint"]),
             int(result.account.data.parsed["info"]["tokenAmount"]["amount"])
         )
-        print(f"ATA INFO {data}")
+        #print(f"ATA INFO {data}")
         return data
 
     @classmethod
@@ -240,7 +240,7 @@ class BotManager:
                     async for websocket in connect(ENDPOINT_WSS):
                         with contextlib.suppress(websockets.exceptions.WebSocketException):
                             await self._unsubscribe_token_program(websocket) # closing websocket
-                            
+
                         with contextlib.suppress(websockets.exceptions.ConnectionClosed):
                             await asyncio.gather(*[
                                 self._subscribe_token_program(websocket, program_id) for program_id in program_ids
@@ -264,6 +264,7 @@ class BotManager:
                                         if ata.amount > _target_ata_map[mint_pk].amount:
                                             # for balance increase
                                             #spawn bot
+                                            #if idx < 5:
                                             tg.create_task(
                                                 self._spawn_bot(ata, force=True)
                                             )
